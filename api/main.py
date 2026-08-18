@@ -122,9 +122,11 @@ def _extract_user_message(input_data: Any) -> tuple[str, str]:
         last_text = messages[-1][1]
 
         if len(messages) > 1:
+            # Sliding window: últimos 10 mensajes del historial (5 intercambios pregunta-respuesta)
+            window = messages[:-1][-10:]
             history = "\n".join(
                 f"{'Usuario' if r == 'user' else 'Asistente'}: {t}"
-                for r, t in messages[:-1]
+                for r, t in window
             )
             full_message = f"[Historial de conversación]\n{history}\n\n[Pregunta actual]\n{last_text}"
             return last_text, full_message

@@ -141,6 +141,14 @@ El límite de 2000 caracteres se aplicaba al mensaje ya con el historial inyecta
 
 ---
 
+## Control del historial (sliding window)
+
+Para evitar que el historial inyectado crezca ilimitadamente, se conservan solo los **últimos 10 mensajes** del historial (5 intercambios pregunta-respuesta). Mensajes más antiguos se descartan.
+
+Ver análisis completo de opciones en [Anexo — Manejo del historial](anexos/manejo_historial.md).
+
+---
+
 ## Logging
 
 El endpoint loguea en Cloud Logging:
