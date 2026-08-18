@@ -94,6 +94,7 @@ def _extract_user_message(input_data: Union[str, list[InputMessage]]) -> str:
 # --------------------------------------------------------------------------- #
 
 @app.post("/")
+@app.post("/responses")
 async def create_response(
     body: ResponseRequest,
     request: Request,
