@@ -102,9 +102,10 @@ def _extract_text_from_content(content: Any) -> str:
     return str(content)
 
 
-def _extract_user_message(input_data: Any) -> str:
+def _extract_user_message(input_data: Any) -> tuple[str, str]:
+    """Devuelve (ultimo_mensaje_usuario, mensaje_con_contexto)."""
     if isinstance(input_data, str):
-        return input_data
+        return input_data, input_data
 
     if isinstance(input_data, list) and len(input_data) > 0:
         messages = []
@@ -118,16 +119,17 @@ def _extract_user_message(input_data: Any) -> str:
         if not messages:
             raise HTTPException(status_code=400, detail="No se encontró mensaje del usuario en el input")
 
-        # Si hay historial, incluirlo como contexto en el mensaje actual
+        last_text = messages[-1][1]
+
         if len(messages) > 1:
             history = "\n".join(
                 f"{'Usuario' if r == 'user' else 'Asistente'}: {t}"
                 for r, t in messages[:-1]
             )
-            last_role, last_text = messages[-1]
-            return f"[Historial de conversación]\n{history}\n\n[Pregunta actual]\n{last_text}"
+            full_message = f"[Historial de conversación]\n{history}\n\n[Pregunta actual]\n{last_text}"
+            return last_text, full_message
 
-        return messages[-1][1]
+        return last_text, last_text
 
     raise HTTPException(
         status_code=400,
@@ -158,9 +160,9 @@ async def create_response(
     if input_data is None:
         raise HTTPException(status_code=422, detail="Campo 'input' requerido")
 
-    user_message = _extract_user_message(input_data)
+    last_message, full_message = _extract_user_message(input_data)
 
-    if len(user_message) > 2000:
+    if len(last_message) > 2000:
         raise HTTPException(
             status_code=400,
             detail="Mensaje demasiado largo. Máximo 2000 caracteres.",
@@ -183,7 +185,7 @@ async def create_response(
         session_id=session_id,
         new_message=types.Content(
             role="user",
-            parts=[types.Part(text=user_message)],
+            parts=[types.Part(text=full_message)],
         ),
     ):
         if event.is_final_response() and event.content:
