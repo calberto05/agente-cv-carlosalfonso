@@ -106,17 +106,28 @@ def _extract_user_message(input_data: Any) -> str:
     if isinstance(input_data, str):
         return input_data
 
-    if isinstance(input_data, list):
-        # Busca el último mensaje con role "user"
-        user_messages = []
+    if isinstance(input_data, list) and len(input_data) > 0:
+        messages = []
         for item in input_data:
             role = item.get("role") if isinstance(item, dict) else getattr(item, "role", None)
-            if role == "user":
-                content = item.get("content") if isinstance(item, dict) else getattr(item, "content", "")
-                user_messages.append(_extract_text_from_content(content))
+            content = item.get("content") if isinstance(item, dict) else getattr(item, "content", "")
+            text = _extract_text_from_content(content)
+            if role and text:
+                messages.append((role, text))
 
-        if user_messages:
-            return user_messages[-1]
+        if not messages:
+            raise HTTPException(status_code=400, detail="No se encontró mensaje del usuario en el input")
+
+        # Si hay historial, incluirlo como contexto en el mensaje actual
+        if len(messages) > 1:
+            history = "\n".join(
+                f"{'Usuario' if r == 'user' else 'Asistente'}: {t}"
+                for r, t in messages[:-1]
+            )
+            last_role, last_text = messages[-1]
+            return f"[Historial de conversación]\n{history}\n\n[Pregunta actual]\n{last_text}"
+
+        return messages[-1][1]
 
     raise HTTPException(
         status_code=400,
