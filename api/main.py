@@ -134,6 +134,7 @@ async def create_response(
     request: Request,
     authorization: str = Header(None),
 ):
+    logger.info("Authorization header recibido: %s", authorization)
     _validate_api_key(authorization)
 
     # Leemos el body raw para loguear y parsear con flexibilidad
@@ -181,12 +182,14 @@ async def create_response(
         "id": f"resp_{uuid.uuid4().hex[:24]}",
         "object": "response",
         "created_at": int(time.time()),
+        "status": "completed",
         "model": raw.get("model") or os.environ.get("GEMINI_MODEL", "gemini-2.5-flash"),
         "output": [
             {
                 "type": "message",
                 "id": f"msg_{uuid.uuid4().hex[:24]}",
                 "role": "assistant",
+                "status": "completed",
                 "content": [{"type": "output_text", "text": response_text}],
             }
         ],
