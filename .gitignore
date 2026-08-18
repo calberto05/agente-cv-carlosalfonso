@@ -1,0 +1,4 @@
+.env
+temp/
+cv.json
+*/__pycache__/
