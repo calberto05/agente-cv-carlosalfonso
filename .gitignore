@@ -1,4 +1,29 @@
+# Entorno
 .env
-temp/
+*.env
+
+# CV generado localmente
 cv.json
+
+# Python
+__pycache__/
 */__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# Dependencias resueltas
+*.lock
+
+# Temporal
+temp/
+
+# IDEs
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
