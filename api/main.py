@@ -6,11 +6,12 @@ Modos:
   - Cloud Run: uvicorn api.main:app --host 0.0.0.0 --port 8080
 """
 
+import logging
 import os
 import time
 import uuid
 from contextlib import asynccontextmanager
-from typing import Union
+from typing import Any, Union
 
 import uvicorn
 from dotenv import load_dotenv
@@ -25,11 +26,14 @@ from google.genai import types
 
 from agent.agent import create_agent
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Crea el agente una sola vez al arrancar el servicio."""
-    print("Cargando agente...")
+    logger.info("Cargando agente...")
     cv_agent = create_agent()
     session_service = InMemorySessionService()
     app.state.runner = Runner(
@@ -38,7 +42,7 @@ async def lifespan(app: FastAPI):
         session_service=session_service,
     )
     app.state.session_service = session_service
-    print("Agente listo.")
+    logger.info("Agente listo.")
     yield
 
 
@@ -49,15 +53,22 @@ app = FastAPI(title="CV Agent — Open Responses API", lifespan=lifespan)
 # Modelos de request / response
 # --------------------------------------------------------------------------- #
 
+class ContentBlock(BaseModel):
+    type: str = "input_text"
+    text: str = ""
+
+
 class InputMessage(BaseModel):
     role: str
-    content: str
+    # content puede ser string o lista de bloques (formato OpenAI Responses API)
+    content: Union[str, list[ContentBlock], list[Any]]
 
 
 class ResponseRequest(BaseModel):
     model: str | None = None
-    input: Union[str, list[InputMessage]]
+    input: Union[str, list[InputMessage], list[Any]]
     session_id: str | None = None
+    instructions: str | None = None
 
 
 # --------------------------------------------------------------------------- #
@@ -77,16 +88,40 @@ def _validate_api_key(authorization: str | None) -> None:
         raise HTTPException(status_code=403, detail="API key inválida")
 
 
-def _extract_user_message(input_data: Union[str, list[InputMessage]]) -> str:
+def _extract_text_from_content(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for block in content:
+            if isinstance(block, dict):
+                parts.append(block.get("text", ""))
+            elif hasattr(block, "text"):
+                parts.append(block.text)
+        return " ".join(p for p in parts if p)
+    return str(content)
+
+
+def _extract_user_message(input_data: Any) -> str:
     if isinstance(input_data, str):
         return input_data
-    user_messages = [m.content for m in input_data if m.role == "user"]
-    if not user_messages:
-        raise HTTPException(
-            status_code=400,
-            detail="No se encontró mensaje del usuario en el input",
-        )
-    return user_messages[-1]
+
+    if isinstance(input_data, list):
+        # Busca el último mensaje con role "user"
+        user_messages = []
+        for item in input_data:
+            role = item.get("role") if isinstance(item, dict) else getattr(item, "role", None)
+            if role == "user":
+                content = item.get("content") if isinstance(item, dict) else getattr(item, "content", "")
+                user_messages.append(_extract_text_from_content(content))
+
+        if user_messages:
+            return user_messages[-1]
+
+    raise HTTPException(
+        status_code=400,
+        detail="No se encontró mensaje del usuario en el input",
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -96,13 +131,22 @@ def _extract_user_message(input_data: Union[str, list[InputMessage]]) -> str:
 @app.post("/")
 @app.post("/responses")
 async def create_response(
-    body: ResponseRequest,
     request: Request,
     authorization: str = Header(None),
 ):
     _validate_api_key(authorization)
 
-    user_message = _extract_user_message(body.input)
+    # Leemos el body raw para loguear y parsear con flexibilidad
+    raw = await request.json()
+    logger.info("Payload recibido: %s", raw)
+
+    input_data = raw.get("input")
+    session_id = raw.get("session_id") or str(uuid.uuid4())
+
+    if input_data is None:
+        raise HTTPException(status_code=422, detail="Campo 'input' requerido")
+
+    user_message = _extract_user_message(input_data)
 
     if len(user_message) > 2000:
         raise HTTPException(
@@ -110,7 +154,6 @@ async def create_response(
             detail="Mensaje demasiado largo. Máximo 2000 caracteres.",
         )
 
-    session_id = body.session_id or str(uuid.uuid4())
     runner: Runner = request.app.state.runner
     session_service: InMemorySessionService = request.app.state.session_service
 
@@ -138,7 +181,7 @@ async def create_response(
         "id": f"resp_{uuid.uuid4().hex[:24]}",
         "object": "response",
         "created_at": int(time.time()),
-        "model": os.environ.get("GEMINI_MODEL", "gemini-2.5-flash"),
+        "model": raw.get("model") or os.environ.get("GEMINI_MODEL", "gemini-2.5-flash"),
         "output": [
             {
                 "type": "message",
