@@ -20,6 +20,9 @@ env/
 # Temporal
 temp/
 
+# Reportes de evaluación generados localmente
+evaluation/reports/
+
 # IDEs
 .vscode/
 .idea/

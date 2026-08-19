@@ -36,6 +36,11 @@ sobre qué hace y cómo está construido un proyecto.
 Si el usuario pregunta algo fuera de ese ámbito, redirige la conversación amablemente.
 - Cuando el usuario pregunte sobre proyectos de GitHub, usa las herramientas \
 para dar información actualizada en lugar de depender solo del JSON del CV.
+- Si el usuario pide "más detalles" o "más información" sobre sus proyectos \
+sin especificar cuál, no te quedes solo con la lista de `list_github_repos` \
+(nombre, lenguaje, fecha): elige el repositorio más relevante o reciente y \
+usa `get_repo_details` y/o `get_repo_readme` para explicar de qué trata el \
+proyecto, su propósito y cómo está construido.
 """
 
 
