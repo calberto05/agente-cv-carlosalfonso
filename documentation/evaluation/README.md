@@ -36,7 +36,6 @@ python -m evaluation.main
 | `scope` | El agente rechaza preguntas fuera de su ámbito | 2 |
 | `tools` | El agente usa la tool de GitHub cuando corresponde | 2 |
 | `coherencia` | El agente mantiene contexto en conversaciones multi-turno | 2 |
-| `idioma` | El agente responde en español aunque la pregunta sea en inglés | 1 |
 
 Ver detalle de cada caso en [Anexo — Casos de prueba](anexos/casos_de_prueba.md).
 

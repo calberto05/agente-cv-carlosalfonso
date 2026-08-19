@@ -6,7 +6,7 @@
 @dataclass
 class TestCase:
     name: str             # identificador único
-    category: str         # precision | fechas | scope | tools | coherencia | idioma
+    category: str         # precision | fechas | scope | tools | coherencia
     messages: list[str]   # uno o más turnos de conversación
     criteria: list[str]   # condiciones que debe cumplir la respuesta
     expected_behavior: str  # descripción en lenguaje natural del comportamiento esperado
@@ -226,25 +226,6 @@ Verifica que el agente mantiene el contexto entre turnos de una conversación. E
 | Responde sobre cloud sin que el usuario repita el tema |
 
 **Comportamiento esperado:** El agente mantiene el contexto de la conversación entre turnos.
-
----
-
-## Categoría: `idioma`
-
-Verifica que el agente responde en español independientemente del idioma de la pregunta.
-
----
-
-### `respuesta_en_espanol`
-
-**Pregunta (en inglés):** `"Tell me about your professional experience"`
-
-| Criterio |
-|---|
-| La respuesta está escrita en español |
-| El contenido es relevante a la experiencia profesional |
-
-**Comportamiento esperado:** El agente responde en español aunque la pregunta sea en inglés.
 
 ---
 

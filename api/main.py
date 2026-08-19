@@ -149,7 +149,7 @@ async def create_response(
     request: Request,
     authorization: str = Header(None),
 ):
-    logger.info("Authorization header recibido: %s", authorization)
+    logger.info("Authorization header presente: %s", bool(authorization))
     _validate_api_key(authorization)
 
     # Leemos el body raw para loguear y parsear con flexibilidad
@@ -181,17 +181,31 @@ async def create_response(
             app_name="cv_agent", user_id="user", session_id=session_id
         )
 
-    response_text = ""
-    async for event in runner.run_async(
-        user_id="user",
-        session_id=session_id,
-        new_message=types.Content(
-            role="user",
-            parts=[types.Part(text=full_message)],
-        ),
-    ):
-        if event.is_final_response() and event.content:
-            response_text = event.content.parts[0].text
+    try:
+        response_text = ""
+        async for event in runner.run_async(
+            user_id="user",
+            session_id=session_id,
+            new_message=types.Content(
+                role="user",
+                parts=[types.Part(text=full_message)],
+            ),
+        ):
+            if event.is_final_response() and event.content:
+                response_text = event.content.parts[0].text
+    except Exception:
+        logger.exception("Error al invocar al agente (session_id=%s)", session_id)
+        raise HTTPException(
+            status_code=502,
+            detail="El agente no pudo generar una respuesta. Intenta de nuevo.",
+        )
+
+    if not response_text:
+        logger.error("El agente no produjo una respuesta final (session_id=%s)", session_id)
+        raise HTTPException(
+            status_code=502,
+            detail="El agente no generó una respuesta. Intenta de nuevo.",
+        )
 
     return {
         "id": f"resp_{uuid.uuid4().hex[:24]}",

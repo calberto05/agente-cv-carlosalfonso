@@ -149,10 +149,36 @@ Ver análisis completo de opciones en [Anexo — Manejo del historial](anexos/ma
 
 ---
 
+## Limitaciones conocidas
+
+### Sin rate limiting propio
+
+La única protección del endpoint es el `AGENT_API_KEY` estático validado en cada request (`_validate_api_key`). No hay throttling por IP, por key ni por sesión.
+
+| | |
+|---|---|
+| **Riesgo** | Una API key filtrada (o adivinada por fuerza bruta, dado que es una sola cadena estática sin rotación) permite volumen ilimitado de requests — impacto directo en costo de Gemini y en el rate limit de la API de GitHub |
+| **Por qué no se implementó** | El dato protegido es público (un CV) y el único consumidor esperado es la plataforma de Banorte con un solo key. El riesgo real es de **costo/abuso**, no de fuga de datos sensibles |
+| **Siguiente paso si escala** | Cloud Armor (rate limiting a nivel de Cloud Run/Load Balancer), o un middleware en FastAPI (p. ej. `slowapi`) con límite por IP o por API key. Alternativamente, restringir el servicio a las IPs conocidas de Banorte |
+
+### Sesión en memoria, no compartida entre instancias
+
+`InMemorySessionService` (ver `api/main.py:lifespan`) guarda el estado de sesión de ADK únicamente en la memoria del proceso de **una** instancia de Cloud Run. Cloud Run puede correr varias instancias en paralelo y reemplazarlas (nuevas revisiones, scale-to-zero, reinicios) sin avisar.
+
+**Por qué no rompe la conversación de todos modos:** la continuidad multi-turno **no depende** de esta sesión interna. Como se explica en [Manejo del historial](#manejo-del-historial-de-conversación), el historial completo se reconstruye en cada request a partir del array `input` que reenvía el cliente. Si un `session_id` aterriza en una instancia distinta (sesión ADK vacía ahí), el mensaje que recibe el agente ya trae el contexto completo inyectado como texto — la sesión de ADK actúa más como un contenedor técnico que exige el `Runner`, no como la fuente de verdad de la memoria conversacional.
+
+| Limitación | Detalle |
+|---|---|
+| Sin persistencia entre instancias/reinicios | Esperado y mitigado por el diseño (historial del lado del cliente) |
+| Sin eviction/TTL de sesiones | El diccionario interno de `InMemorySessionService` crece con cada `session_id` nuevo y nunca se libera dentro del ciclo de vida de una instancia — a la escala de este proyecto es despreciable, pero sería un memory leak real bajo tráfico alto y sostenido |
+| Siguiente paso si se requiere persistencia real | `DatabaseSessionService` o `VertexAiSessionService` de ADK, respaldados por Firestore/Cloud SQL, en vez de la variante en memoria |
+
+---
+
 ## Logging
 
 El endpoint loguea en Cloud Logging:
-- `Authorization header recibido: ...` — para auditar la API key que llega
+- `Authorization header presente: true/false` — para auditar si llegó el header, **sin loguear el valor** (evita exponer el API key en los logs)
 - `Payload recibido: ...` — el body completo de cada request
 
 Para ver los logs en tiempo real:
